@@ -29,9 +29,8 @@ Kits with all required components are available at https://www.airgradient.com/d
 
 MIT License
 */
-
+#include <Arduino.h>
 #include <AirGradient.h>
-
 #include <WiFiManager.h>
 
 #include <ESP8266WiFi.h>
@@ -40,7 +39,7 @@ MIT License
 
 #include <Wire.h>
 #include <NTPClient.h>
-#include "SH1106Wire.h" 
+#include "SH1106Wire.h"
 // #include "SSD1306Wire.h"
 // #include "Configfile.h"
 #include "LittleFS.h"
@@ -53,6 +52,18 @@ MIT License
 void connectToWifi();
 void showTextRectangle(String ln1, String ln2, boolean small);
 int PM_TO_AQI_US(int pm02);
+void displaytime();
+#include <Ticker.h>
+long uptime = 0;
+String timenow;
+Ticker flipper;
+long updatedatatime = 0;
+long showdisplay = 0;
+long showpm = 0;
+long showco = 0;
+long showsht = 0;
+long showdate = 0;
+boolean senddatanow = false;
 AirGradient ag = AirGradient();
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
@@ -183,19 +194,33 @@ void listdata()
   while (dirs.next())
   {
     String fn = dirs.fileName();
-    Serial.printf("FileName:%s\n",fn);
+    Serial.printf("FileName:%s\n", fn);
   }
 
   Serial.println("End list");
+}
+void timecheck()
+{
+  timenow = timeClient.getFormattedTime();
+  updatedatatime++;
+  uptime++;
+  if (!senddatanow)
+  {
+    showdisplay++;
+  }
+  showdate++;
+  // displaytime();
+  // Serial.println(timenow);
 }
 void setup()
 {
   Serial.begin(9600);
 
   display.init();
-  display.flipScreenVertically();
+  // display
+  displaytime();
   showTextRectangle("Init", String(ESP.getChipId(), HEX), true);
-  if(LittleFS.begin())
+  if (LittleFS.begin())
   {
     Serial.println("LittleFs Open file");
     listdata();
@@ -217,8 +242,13 @@ void setup()
   {
     connectToWifi();
     timeClient.begin();
+    timeClient.setTimeOffset(25200);
+    timeClient.forceUpdate();
   }
+  flipper.attach(1.0, timecheck);
+  displaytime();
   delay(2000);
+  display.clear();
 }
 
 void loop()
@@ -238,16 +268,17 @@ void loop()
     int PM2 = ag.getPM2_Raw();
     payload = payload + "\"pm02\":" + String(PM2);
 
-    if (inUSaqi)
+    if (showdisplay % 10 == 0)
     {
-      showTextRectangle("AQI", String(PM_TO_AQI_US(PM2)), false);
+      if (inUSaqi)
+      {
+        showTextRectangle("AQI", String(PM_TO_AQI_US(PM2)), false);
+      }
+      else
+      {
+        showTextRectangle("PM2", String(PM2), false);
+      }
     }
-    else
-    {
-      showTextRectangle("PM2", String(PM2), false);
-    }
-
-    delay(3000);
   }
 
   if (hasCO2)
@@ -256,43 +287,47 @@ void loop()
       payload = payload + ",";
 
 #ifndef s8
-  
-      int CO2 = ag.getCO2_Raw();
-  
+
+    int CO2 = ag.getCO2_Raw();
+
     payload = payload + "\"rco2\":" + String(CO2);
-    showTextRectangle("CO2", String(CO2), false);
+    if (showdisplay % 20 == 0)
+    {
+
+      showTextRectangle("CO2", String(CO2), false);
 
 #endif
 
 #ifdef s8
 
-    int co2 = 0;
-    int i = 0;
-    while (i < 10)
-    {
-
-      co2 = sensor_S8->get_co2();
-      sensor.co2 = co2;
-      if (sensor.co2 > 0)
+      int co2 = 0;
+      int i = 0;
+      while (i < 10)
       {
-        break;
-        // sensor.co2 = sensor_S8->get_co2();
-      }
-      else
-      {
-        Serial.printf("CO2 eRROR %d\n", co2);
-        delay(15000);
+
+        co2 = sensor_S8->get_co2();
+        sensor.co2 = co2;
+        if (sensor.co2 > 0)
+        {
+          break;
+          // sensor.co2 = sensor_S8->get_co2();
+        }
+        else
+        {
+          Serial.printf("CO2 eRROR %d\n", co2);
+          delay(15000);
+        }
+
+        i++;
       }
 
-      i++;
-    }
-
-    // printf("CO2 value = %d ppm\n", sensor.co2);
-    payload = payload + "\"rco2\":" + String(sensor.co2);
-    showTextRectangle("CO2", String(sensor.co2), false);
+      // printf("CO2 value = %d ppm\n", sensor.co2);
+      payload = payload + "\"rco2\":" + String(sensor.co2);
+      showTextRectangle("CO2", String(sensor.co2), false);
 #endif
-    delay(3000);
+    }
   }
+
   if (hasSHT)
   {
     if (hasCO2 || hasPM)
@@ -300,16 +335,18 @@ void loop()
     TMP_RH result = ag.periodicFetchData();
     payload = payload + "\"atmp\":" + String(result.t) + ",\"rhum\":" + String(result.rh);
 
-    if (inF)
+    if (showdisplay % 30 == 0)
     {
-      showTextRectangle(String((result.t * 9 / 5) + 32), String(result.rh) + "%", false);
+      showdisplay = 0;
+      if (inF)
+      {
+        showTextRectangle(String((result.t * 9 / 5) + 32), String(result.rh) + "%", false);
+      }
+      else
+      {
+        showTextRectangle(String(result.t), String(result.rh) + "%", false);
+      }
     }
-    else
-    {
-      showTextRectangle(String(result.t), String(result.rh) + "%", false);
-    }
-
-    delay(3000);
   }
 
   timeClient.forceUpdate();
@@ -318,10 +355,13 @@ void loop()
   payload = payload + ",\"t\":" + fn;
   payload = payload + "}";
 
+  displaytime();
   // Serial.println(payload);
   // send payload
-  if (connectWIFI)
+  if (connectWIFI && updatedatatime >= 32)
   {
+    senddatanow = true;
+    updatedatatime = 0;
     // Serial.println(payload);
     String POSTURL = APIROOT + "sensors/airgradient:" + String(ESP.getChipId(), HEX) + "/measures";
     // Serial.println(POSTURL);
@@ -337,17 +377,34 @@ void loop()
       listdata();
     }
     String response = http.getString();
-    // Serial.println(httpCode);
-    // Serial.println(response);
     http.end();
-    delay(21000);
+    senddatanow = false;
   }
 }
-
+String lasttimedisplay;
+void displaytime()
+{
+  if (showdate > 0)
+  {
+    showdate = 0;
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+    display.setFont(ArialMT_Plain_10);
+    display.setColor(BLACK);
+    display.drawStringf(5, 2, "%s", lasttimedisplay);
+    display.display();
+    display.setColor(WHITE);
+    lasttimedisplay = timenow;
+    display.drawString(5, 2, lasttimedisplay);
+    display.display();
+  }
+}
 // DISPLAY
+String ln1lastdisplay;
+String ln2lastdisplay;
 void showTextRectangle(String ln1, String ln2, boolean small)
 {
-  display.clear();
+  // display.clear();
+
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   if (small)
   {
@@ -357,8 +414,17 @@ void showTextRectangle(String ln1, String ln2, boolean small)
   {
     display.setFont(ArialMT_Plain_24);
   }
-  display.drawString(32, 16, ln1);
-  display.drawString(32, 36, ln2);
+
+  display.setColor(BLACK);
+  display.drawString(5, 16, ln1lastdisplay);
+  display.drawString(5, 36, ln2lastdisplay);
+  display.display();
+
+  display.setColor(WHITE);
+  ln1lastdisplay = ln1;
+  ln2lastdisplay = ln2;
+  display.drawString(5, 16, ln1lastdisplay);
+  display.drawString(5, 36, ln2lastdisplay);
   display.display();
 }
 

@@ -2,6 +2,8 @@
 #include <unity.h>
 #include <Wire.h>
 #include "LittleFS.h"
+#include "SH1106Wire.h"
+SH1106Wire display(0x3c, SDA, SCL);
 // void setUp(void) {
 // // set stuff up here
 // }
@@ -9,6 +11,21 @@
 // void tearDown(void) {
 // // clean stuff up here
 // }
+void testDisplay()
+{
+    display.init();
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+    display.setFont(ArialMT_Plain_10);
+    // display.drawString(32, 2, "           ");
+    display.clear();
+    display.drawString(32, 2, "22:22:21");
+    display.display();
+    display.drawString(32,10,"33333");
+    delay(2000);
+    display.setColor(BLACK);
+    display.drawStringf(32,2,"%s","22:22:21");
+    display.display();
+}
 void testI2c()
 {
     byte error, address;
@@ -75,7 +92,7 @@ void testWritefile()
     file.print("test 2");
     file.close();
 
-     file = LittleFS.open("/data/1234567890010", "w");
+    file = LittleFS.open("/data/1234567890010", "w");
     file.print("test long name");
     file.close();
 }
@@ -120,9 +137,10 @@ void setup()
     UNITY_BEGIN(); // IMPORTANT LINE!
     // RUN_TEST(test_led_builtin_pin_number);
     // RUN_TEST(testI2c);
-    RUN_TEST(testOpenfile);
-    RUN_TEST(testWritefile);
-    RUN_TEST(testOpenDir);
+    // RUN_TEST(testOpenfile);
+    // RUN_TEST(testWritefile);
+    // RUN_TEST(testOpenDir);
+    RUN_TEST(testDisplay);
     pinMode(LED_BUILTIN, OUTPUT);
     UNITY_END();
 }
