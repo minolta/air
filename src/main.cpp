@@ -66,6 +66,7 @@ long showco = 0;
 long showsht = 0;
 long showdate = 0;
 int CO2 = 0;
+int PM2;
 TMP_RH result;
 boolean senddatanow = false;
 AirGradient ag = AirGradient();
@@ -153,6 +154,7 @@ void status()
   bf["t"] = result.t;
   bf["h"] = result.rh;
   bf["co2"] = CO2;
+  bf["pm2"] = PM2;
   // server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   // server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   server.sendHeader("Access-Control-Allow-Headers", "application/json");
@@ -290,7 +292,7 @@ void loop()
 
   if (hasPM)
   {
-    int PM2 = ag.getPM2_Raw();
+    PM2 = ag.getPM2_Raw();
     payload = payload + "\"pm02\":" + String(PM2);
 
     if (showdisplay % 10 == 0)
