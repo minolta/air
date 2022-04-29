@@ -155,6 +155,7 @@ void status()
   bf["h"] = result.rh;
   bf["co2"] = CO2;
   bf["pm2"] = PM2;
+  bf["uptime"] = uptime;
   // server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   // server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   server.sendHeader("Access-Control-Allow-Headers", "application/json");
