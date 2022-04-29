@@ -32,7 +32,7 @@ MIT License
 #include <Arduino.h>
 #include <AirGradient.h>
 #include <WiFiManager.h>
-
+#include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
 
 #include <ESP8266HTTPClient.h>
@@ -53,6 +53,8 @@ void connectToWifi();
 void showTextRectangle(String ln1, String ln2, boolean small);
 int PM_TO_AQI_US(int pm02);
 void displaytime();
+
+ESP8266WebServer server(80);
 #include <Ticker.h>
 long uptime = 0;
 String timenow;
@@ -63,6 +65,8 @@ long showpm = 0;
 long showco = 0;
 long showsht = 0;
 long showdate = 0;
+int CO2 = 0;
+TMP_RH result;
 boolean senddatanow = false;
 AirGradient ag = AirGradient();
 WiFiUDP ntpUDP;
@@ -141,6 +145,25 @@ void setS8()
   Serial.println("");
 }
 #endif
+#define size 200
+void status()
+{
+  StaticJsonDocument<size> bf;
+  char b[size];
+  bf["t"] = result.t;
+  bf["h"] = result.rh;
+  bf["co2"] = CO2;
+  // server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+  // server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  server.sendHeader("Access-Control-Allow-Headers", "application/json");
+  serializeJson(bf, b, size);
+  server.send(200, "application/json", b);
+}
+void setHttp()
+{
+  server.on("/", status);
+  server.begin();
+}
 void scani2c()
 {
   byte error, address;
@@ -244,6 +267,7 @@ void setup()
     timeClient.begin();
     timeClient.setTimeOffset(25200);
     timeClient.forceUpdate();
+    setHttp();
   }
   flipper.attach(1.0, timecheck);
   displaytime();
@@ -255,6 +279,7 @@ void loop()
 {
 
   // create payload
+  server.handleClient();
   if (Serial.available())
   {
     char key = Serial.read();
@@ -288,7 +313,7 @@ void loop()
 
 #ifndef s8
 
-    int CO2 = ag.getCO2_Raw();
+    CO2 = ag.getCO2_Raw();
 
     payload = payload + "\"rco2\":" + String(CO2);
     if (showdisplay % 20 == 0)
@@ -332,7 +357,7 @@ void loop()
   {
     if (hasCO2 || hasPM)
       payload = payload + ",";
-    TMP_RH result = ag.periodicFetchData();
+    result = ag.periodicFetchData();
     payload = payload + "\"atmp\":" + String(result.t) + ",\"rhum\":" + String(result.rh);
 
     if (showdisplay % 30 == 0)
